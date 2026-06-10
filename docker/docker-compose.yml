@@ -1,0 +1,183 @@
+version: '3.8'
+
+services:
+  # Node 1: Kafka Event Stream
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    hostname: kafka
+    container_name: kafka
+    ports:
+      - "9092:9092"
+      - "9101:9101"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092'
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_JMX_PORT: 9101
+      KAFKA_JMX_HOSTNAME: localhost
+    volumes:
+      - kafka-storage:/var/lib/kafka/data
+
+  # Node 2: PostgreSQL
+  postgres:
+    image: postgres:15
+    container_name: postgres
+    environment:
+      POSTGRES_USER: machine
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secure_password}
+      POSTGRES_DB: machine_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-storage:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U machine"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Node 3: Neo4j
+  neo4j:
+    image: neo4j:5.12
+    container_name: neo4j
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-secure_password}
+      NEO4J_apoc_export_file_enabled: 'true'
+      NEO4J_apoc_import_file_enabled: 'true'
+    ports:
+      - "7687:7687"
+      - "7474:7474"
+    volumes:
+      - neo4j-storage:/var/lib/neo4j/data
+    healthcheck:
+      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "${NEO4J_PASSWORD:-secure_password}", "RETURN 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Node 4: OpenSearch
+  opensearch:
+    image: opensearchproject/opensearch:2.10.0
+    container_name: opensearch
+    environment:
+      - discovery.type=single-node
+      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_PASSWORD:-SecurePassword1!}
+    ports:
+      - "9200:9200"
+      - "9600:9600"
+    volumes:
+      - opensearch-storage:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s https://localhost:9200 -u admin:${OPENSEARCH_PASSWORD:-SecurePassword1!} --insecure | grep -q 'tagline'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Node 5: Whisper + spaCy (Perception)
+  perception:
+    build:
+      context: ./nodes/perception
+      dockerfile: Dockerfile
+    container_name: perception
+    ports:
+      - "8001:8000"
+    environment:
+      MODEL_SIZE: "base"
+    volumes:
+      - ./models:/models
+    depends_on:
+      - kafka
+
+  # Node 6: Ray + LLM
+  ray-head:
+    image: rayproject/ray:latest-gpu
+    container_name: ray-head
+    ports:
+      - "6379:6379"
+      - "8265:8265"
+    command: ray start --head --port=6379 --dashboard-host=0.0.0.0
+    volumes:
+      - ray-storage:/tmp/ray
+
+  llm-server:
+    build:
+      context: ./nodes/llm
+      dockerfile: Dockerfile
+    container_name: llm-server
+    ports:
+      - "8002:8000"
+    environment:
+      MODEL_NAME: "mistral-7b"
+      VLLM_GPU_MEMORY_UTILIZATION: 0.9
+    depends_on:
+      - ray-head
+    volumes:
+      - ./models:/models
+
+  # Node 7: Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+    volumes:
+      - grafana-storage:/var/lib/grafana
+      - ./config/grafana/dashboards:/etc/grafana/provisioning/dashboards
+    depends_on:
+      - postgres
+      - opensearch
+
+  # Core application
+  machine-core:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: machine-core
+    environment:
+      KAFKA_BROKER: kafka:29092
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: machine
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secure_password}
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-secure_password}
+      OPENSEARCH_HOST: opensearch
+      RAY_HEAD_ADDRESS: ray-head:6379
+      LLM_SERVER_URL: http://llm-server:8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      kafka:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+      ray-head:
+        condition: service_started
+      llm-server:
+        condition: service_started
+    volumes:
+      - ./core:/app/core
+      - ./loops:/app/loops
+      - ./models:/models
+
+volumes:
+  kafka-storage:
+  postgres-storage:
+  neo4j-storage:
+  opensearch-storage:
+  grafana-storage:
+  ray-storage:
+
+networks:
+  default:
+    name: machine-network

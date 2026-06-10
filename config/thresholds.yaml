@@ -1,0 +1,53 @@
+# Thresholds and configuration parameters
+
+health_monitoring:
+  check_interval_seconds: 30
+  failure_threshold: 3
+  restart_backoff_seconds: 5
+  service_timeout_seconds: 10
+
+entity_extraction:
+  spacy_model: "en_core_web_lg"
+  whisper_model: "base"
+  confidence_threshold: 0.5
+  duplicate_threshold: 0.8
+
+graph_management:
+  min_relationship_confidence: 0.6
+  max_path_length: 5
+  cluster_min_size: 3
+  update_batch_size: 100
+
+self_prompting:
+  loop_interval_seconds: 60
+  confidence_threshold: 0.7
+  low_confidence_flag_threshold: 0.5
+  max_events_per_iteration: 1000
+
+reflection_engine:
+  run_interval_seconds: 300
+  review_batch_size: 50
+  deep_analysis_threshold: 0.4
+
+task_generation:
+  max_tasks_per_iteration: 10
+  priority_decay_hours: 24
+  duplicate_task_threshold: 0.85
+
+approval_gate:
+  auto_approve_types:
+    - "prompt_update"
+    - "config_change"
+  approval_required_types:
+    - "code_modification"
+    - "deployment"
+    - "model_retrain"
+  approval_timeout_hours: 24
+  max_pending_requests: 50
+
+performance:
+  max_memory_mb: 4096
+  max_cpu_percent: 80
+  latency_threshold_ms: 5000
+  accuracy_threshold: 0.75
+  error_rate_threshold: 0.05

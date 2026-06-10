@@ -1,0 +1,109 @@
+# Prompts for self-prompting loop and reflection engine
+
+self_prompting:
+  observation_analysis: |
+    You are analyzing a continuous stream of observations from a knowledge graph.
+    
+    Current observations:
+    {observations}
+    
+    Identify:
+    1. Missing information or gaps
+    2. Contradictions or inconsistencies
+    3. Unknown entities needing investigation
+    4. Relationship patterns or anomalies
+    5. Confidence issues or uncertain conclusions
+    
+    For each item:
+    - Brief description
+    - Suggested action
+    - Confidence level (0.0-1.0)
+  
+  relationship_inference: |
+    Given these entities, what relationships might exist between them?
+    
+    Entities:
+    {entities}
+    
+    Suggest potential relationships with:
+    - Type of relationship
+    - Confidence score
+    - Evidence or reasoning
+  
+  anomaly_detection: |
+    Review the following graph relationships and identify anomalies.
+    
+    Relationships:
+    {relationships}
+    
+    Identify:
+    - Suspicious patterns
+    - Outliers or unexpected connections
+    - Potential data quality issues
+    - Recommended investigation steps
+
+reflection_engine:
+  self_review: |
+    Review your previous conclusions about the following observations.
+    
+    Previous analysis:
+    {previous_analysis}
+    
+    Find:
+    - Mistakes or incorrect assumptions
+    - Missing links or connections
+    - Outdated information
+    - Duplicate entities
+    - Confidence failures
+    
+    Suggest improvements and corrections.
+  
+  confidence_evaluation: |
+    Evaluate the confidence of these conclusions.
+    
+    Conclusions:
+    {conclusions}
+    
+    For each conclusion:
+    - Justification for current confidence score
+    - Evidence supporting higher/lower confidence
+    - Recommended confidence level revision
+    - Additional data needed for validation
+  
+  pattern_discovery: |
+    Look for patterns in the entity relationships.
+    
+    Relationships:
+    {relationships}
+    
+    Identify:
+    - Recurring patterns or cycles
+    - Network effects or cascades
+    - Temporal patterns
+    - Causal relationships
+    - Predictive indicators
+
+task_generation:
+  priority_assessment: |
+    Given the current observations and missing information, what should we investigate next?
+    
+    Observations:
+    {observations}
+    
+    Missing information:
+    {missing}
+    
+    Generate priority-ordered tasks:
+    - Task description
+    - Why it's important
+    - Expected information gain
+    - Estimated effort
+  
+  search_formulation: |
+    We need to find more information about: {topic}
+    
+    Generate effective search queries:
+    - Boolean search queries
+    - Entity name variations
+    - Related keywords
+    - Source recommendations
